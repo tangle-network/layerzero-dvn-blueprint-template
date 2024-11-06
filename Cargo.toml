@@ -19,7 +19,7 @@ color-eyre = "0.6"
 structopt = "0.3.26"
 tokio = { version = "1.39", default-features = false, features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["parking_lot", "env-filter"] }
-alloy-primitives = "0.7.2"
+alloy-primitives = "0.8.11"
 alloy-json-abi = { version = "0.7.2", features = ["serde_json"] }
 alloy-sol-types = { version = "0.7.2", features = ["json"] }
 alloy-rpc-types = { version = "0.1" }

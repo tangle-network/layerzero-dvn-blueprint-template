@@ -265,14 +265,25 @@ version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd58d377699e6cfeab52c4a9d28bdc4ef37e2bd235ff2db525071fe37a2e9af5"
 dependencies = [
+ "alloy-rlp",
  "bytes",
  "cfg-if",
  "const-hex",
  "derive_more 1.0.0",
+ "foldhash",
+ "hashbrown 0.15.1",
  "hex-literal",
+ "indexmap 2.6.0",
  "itoa",
+ "k256",
+ "keccak-asm",
  "paste",
+ "proptest",
+ "rand",
  "ruint",
+ "rustc-hash 2.0.0",
+ "serde",
+ "sha3",
  "tiny-keccak",
 ]
 
@@ -5642,7 +5653,7 @@ dependencies = [
  "alloy-contract",
  "alloy-json-abi",
  "alloy-network",
- "alloy-primitives 0.7.7",
+ "alloy-primitives 0.8.11",
  "alloy-provider",
  "alloy-pubsub",
  "alloy-rpc-types",
@@ -5691,7 +5702,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -7296,7 +7307,7 @@ checksum = "4e69bf016dc406eff7d53a7d3f7cf1c2e72c82b9088aac1118591e36dd2cd3e9"
 dependencies = [
  "bitcoin_hashes",
  "rand",
- "rand_core 0.6.4",
+ "rand_core 0.5.1",
  "serde",
  "unicode-normalization",
 ]
@@ -11921,7 +11932,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
