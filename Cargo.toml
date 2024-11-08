@@ -22,7 +22,7 @@ tracing-subscriber = { version = "0.3", features = ["parking_lot", "env-filter"]
 alloy-primitives = "0.7.2"
 alloy-json-abi = { version = "0.7.2", features = ["serde_json"] }
 alloy-sol-types = { version = "0.7.2", features = ["json"] }
-alloy-rpc-types = { version = "0.1" }
+alloy-rpc-types = { version = "0.6" }
 alloy-rpc-types-eth = { version = "0.1" }
 alloy-provider = { version = "0.1", default-features = false, features = ["reqwest", "ws"] }
 alloy-pubsub = { version = "0.1" }
