@@ -1,0 +1,24 @@
+[package]
+name = "layerzero-dvn-blueprint-bin"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+layerzero-dvn-blueprint-template-lib.workspace = true
+blueprint-sdk = { workspace = true, features = ["tangle"] }
+color-eyre.workspace = true
+tokio.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tower = { workspace = true, features = ["filter"] }
+
+[build-dependencies]
+layerzero-dvn-blueprint-template-lib.workspace = true
+blueprint-sdk = { workspace = true, features = ["tangle", "macros", "build"] }

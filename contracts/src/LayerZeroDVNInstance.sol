@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: LZBL-1.2
 pragma solidity ^0.8.20;
 
-import "@layerzerolabs-lz-evm-messagelib-v2/contracts/uln/interfaces/ILayerZeroDVN.sol";
-import "@layerzerolabs-lz-evm-messagelib-v2/contracts/uln/interfaces/IDVNFeeLib.sol";
-import "@layerzerolabs-lz-evm-messagelib-v2/contracts/uln/dvn/DVNFeeLib.sol";
-import "@layerzerolabs-lz-evm-messagelib-v2/contracts/uln/dvn/adapters/DVNAdapterBase.sol";
-import "@layerzerolabs-lz-evm-messagelib-v2/contracts/uln/dvn/adapters/libs/DVNAdapterMessageCodec.sol";
-import "@openzeppelin-contracts/access/Ownable.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/interfaces/ILayerZeroDVN.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/interfaces/IDVNFeeLib.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/dvn/DVNFeeLib.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/dvn/adapters/DVNAdapterBase.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/dvn/adapters/libs/DVNAdapterMessageCodec.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import {PacketV1Codec} from "@layerzerolabs/lz-evm-protocol-v2/contracts/messagelib/libs/PacketV1Codec.sol";
+import {ReceiveUlnBase} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/ReceiveUlnBase.sol";
+import {IDVN} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/interfaces/IDVN.sol";
+import {IReceiveUlnE2} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/interfaces/IReceiveUlnE2.sol";
+import {EndpointV2} from "../../dependencies/@layerzerolabs-lz-evm-protocol-v2-3.0.75/contracts/EndpointV2.sol";
 
 /**
  * @title LayerZeroDVNInstance
  * @dev Basic DVN implementation that integrates with LayerZero ULN for verification
  */
-contract LayerZeroDVNInstance is DVNAdapterBase {
+contract LayerZeroDVNInstance is Worker, IDVN {
+    EndpointV2 public immutable endpointV2;
+    uint32 public immutable localEidV2; // endpoint-v2 only, for read call
+    uint64 public immutable quorum;
+
     // Events
     event JobAssigned(uint32 dstEid, bytes32 payloadHash, uint64 confirmations, address sender);
     event FeeConfigSet(uint32 dstEid, uint256 baseFee);
@@ -22,8 +31,6 @@ contract LayerZeroDVNInstance is DVNAdapterBase {
 
     // State variables
     mapping(uint32 => uint256) public baseFees; // dstEid => base fee amount
-    mapping(bytes32 => bool) public verifiedMessages; // messageId => verified status
-    IDVNFeeLib public feeLib;
 
     // Errors
     error MessageAlreadyVerified();
@@ -32,65 +39,93 @@ contract LayerZeroDVNInstance is DVNAdapterBase {
     error DstEidMismatch();
     error CustomVerificationFailed();
 
-    // Match IDVN.DstConfig types
-    struct DstConfig {
-        uint64 gas;
-        uint16 multiplierBps;
-        uint128 floorMarginUSD;
-    }
-
     mapping(uint32 => DstConfig) public dstConfig;
 
-    constructor(address _owner, address[] memory _admins, address payable _feeLib) DVNAdapterBase(_owner, _admins, 0) {
-        feeLib = IDVNFeeLib(_feeLib);
+    /// @dev DVN doesn't have a roleAdmin (address(0x0))
+    /// @dev Supports all of ULNv2, ULN301, ULN302 and more
+    /// @param _endpoint endpoint address
+    /// @param _messageLibs array of message lib addresses that are granted the MESSAGE_LIB_ROLE
+    /// @param _priceFeed price feed address
+    /// @param _signers array of signer addresses for multisig
+    /// @param _quorum quorum for multisig
+    /// @param _admins array of admin addresses that are granted the ADMIN_ROLE
+    constructor(
+        address _endpoint,
+        address[] memory _messageLibs,
+        address _priceFeed,
+        address[] memory _signers,
+        uint64 _quorum,
+        address[] memory _admins
+    ) Worker(_messageLibs, _priceFeed, 12000, address(0x0), _admins) {
+        endpointV2 = EndpointV2(_endpoint);
+        localEidV2 = endpointV2.eid();
+        quorum = _quorum;
     }
 
     /**
      * @notice Called by LayerZero endpoint when a new verification job is assigned
      */
-    function assignJob(AssignJobParam calldata _param, bytes calldata _options)
-        external
-        payable
-        override
-        onlyAcl(_param.sender)
-        returns (uint256 fee)
-    {
-        // Get the receive library for the destination chain
-        bytes32 receiveLib = _getAndAssertReceiveLib(msg.sender, _param.dstEid);
-
+    function assignJob(
+        AssignJobParam calldata _param,
+        bytes calldata _options
+    ) external payable onlyRole(MESSAGE_LIB_ROLE) onlyAcl(_param.sender) returns (uint256 totalFee) {
         // Calculate fee based on destination chain and confirmations
-        fee = getFee(_param.dstEid, _param.confirmations, _param.sender, _options);
-        require(msg.value >= fee, "LayerZeroDVNInstance: insufficient fee");
+        totalFee = getFee(_param.dstEid, _param.confirmations, _param.sender, _options);
+        require(msg.value >= totalFee, "LayerZeroDVNInstance: insufficient fee");
 
         // Emit event for off-chain DVN to pick up the job
         emit JobAssigned(_param.dstEid, _param.payloadHash, _param.confirmations, _param.sender);
 
         // Return excess fee
-        if (msg.value > fee) {
-            (bool success,) = msg.sender.call{value: msg.value - fee}("");
+        if (msg.value > totalFee) {
+            (bool success,) = msg.sender.call{value: msg.value - totalFee}("");
             require(success, "LayerZeroDVNInstance: failed to return excess fee");
         }
 
-        emit VerifierFeePaid(fee);
-        return fee;
+        emit VerifierFeePaid(totalFee);
+        return totalFee;
+    }
+
+    /// @dev to support ReadLib
+    // @param _packetHeader - version + nonce + path
+    // @param _cmd - the command to be executed to obtain the payload
+    // @param _options - options
+    function assignJob(
+        address _sender,
+        bytes calldata /*_packetHeader*/,
+        bytes calldata _cmd,
+        bytes calldata _options
+    ) external payable onlyRole(MESSAGE_LIB_ROLE) onlyAcl(_sender) returns (uint256 totalFee) {
+        IDVNFeeLib.FeeParamsForRead memory feeParams = IDVNFeeLib.FeeParamsForRead(
+            priceFeed,
+            _sender,
+            quorum,
+            defaultMultiplierBps
+        );
+        totalFee = IDVNFeeLib(workerFeeLib).getFeeOnSend(feeParams, dstConfig[localEidV2], _cmd, _options);
+        require(msg.value >= totalFee, "LayerZeroDVNInstance: insufficient fee");
+
+        // Emit event for off-chain DVN to pick up the job
+        emit JobAssigned(localEidV2, keccak256(_cmd), 0, _sender);
+
+        // Return excess fee
+        if (msg.value > totalFee) {
+            (bool success,) = msg.sender.call{value: msg.value - totalFee}("");
+            require(success, "LayerZeroDVNInstance: failed to return excess fee");
+        }
+
+        emit VerifierFeePaid(totalFee);
+        return totalFee;
     }
 
     /**
      * @notice Verify a message from the off-chain DVN
      */
-    function verifyMessageHash(bytes32 messageId, bytes calldata message)
-        external
-        onlyRole(ADMIN_ROLE)
-        returns (uint256)
+    function verifyMessageHash(bytes32 messageId, bytes memory packetHeader, bytes32 payloadHash)
+    external
+    onlyRole(ADMIN_ROLE)
+    returns (bool)
     {
-        // Check if message was already verified
-        if (verifiedMessages[messageId]) {
-            revert MessageAlreadyVerified();
-        }
-
-        // Decode the message using DVNAdapterMessageCodec
-        (address receiveLib, bytes memory packetHeader, bytes32 payloadHash) = DVNAdapterMessageCodec.decode(message);
-
         // Decode packet header to get source and destination info
         (uint64 nonce, uint32 srcEid, uint32 dstEid, bytes32 receiver) = _decodePacketHeader(packetHeader);
 
@@ -107,44 +142,63 @@ contract LayerZeroDVNInstance is DVNAdapterBase {
         // }
 
         // Verify the message using ULN contract
-        _decodeAndVerify(srcEid, message);
-
-        // Mark message as verified
-        verifiedMessages[messageId] = true;
+        (address receiveLibrary,) = endpointV2.getReceiveLibrary(address(uint160(uint256(receiver))), dstEid);
+        IReceiveUlnE2(receiveLibrary).verify(
+            packetHeader,
+            payloadHash,
+            type(uint64).max
+        );
 
         emit MessageVerified(nonce, payloadHash);
         emit HashVerified(uint256(messageId), payloadHash);
 
-        return 1; // Success
+        return true; // Success
     }
 
     /**
      * @notice Get the fee for verifying a packet
      */
     function getFee(uint32 _dstEid, uint64 _confirmations, address _sender, bytes calldata _options)
-        public
-        view
-        override
-        returns (uint256 fee)
+    public
+    view
+    override
+    returns (uint256 fee)
     {
         uint256 baseFee = baseFees[_dstEid];
 
-        IDVNFeeLib.FeeParams memory params = IDVNFeeLib.FeeParams({
-            dstEid: _dstEid,
-            confirmations: _confirmations,
-            sender: _sender,
-            quorum: 1, // Default quorum, adjust as needed
-            priceFeed: address(0), // TODO: Add price feed address
-            defaultMultiplierBps: 10000 // Default multiplier basis points
-        });
+        IDVNFeeLib.FeeParams memory params = IDVNFeeLib.FeeParams(
+            priceFeed,
+            _dstEid,
+            _confirmations,
+            _sender,
+            quorum,
+            defaultMultiplierBps
+        );
+        uint256 dynamicFee = IDVNFeeLib(workerFeeLib).getFee(params, dstConfig[_dstEid], _options);
+        return baseFee + dynamicFee;
+    }
 
-        IDVN.DstConfig memory config = IDVN.DstConfig({
-            gas: dstConfig[_dstEid].gas,
-            multiplierBps: dstConfig[_dstEid].multiplierBps,
-            floorMarginUSD: dstConfig[_dstEid].floorMarginUSD
-        });
+    /// @dev to support ReadLib
+    // @param _packetHeader - version + nonce + path
+    // @param _cmd - the command to be executed to obtain the payload
+    // @param _options - options
+    function getFee(
+        address _sender,
+        bytes calldata _packetHeader,
+        bytes calldata _cmd,
+        bytes calldata _options
+    ) external view onlyAcl(_sender) returns (uint256 fee) {
+        uint32 _dstEid = PacketV1Codec.dstEid(_packetHeader);
 
-        uint256 dynamicFee = feeLib.getFee(params, config, _options);
+        uint256 baseFee = baseFees[_dstEid];
+
+        IDVNFeeLib.FeeParamsForRead memory feeParams = IDVNFeeLib.FeeParamsForRead(
+            priceFeed,
+            _sender,
+            quorum,
+            defaultMultiplierBps
+        );
+        uint256 dynamicFee = IDVNFeeLib(workerFeeLib).getFee(feeParams, dstConfig[localEidV2], _cmd, _options);
         return baseFee + dynamicFee;
     }
 
@@ -152,15 +206,17 @@ contract LayerZeroDVNInstance is DVNAdapterBase {
      * @notice Decode packet header according to LayerZero format
      */
     function _decodePacketHeader(bytes memory packetHeader)
-        internal
-        pure
-        returns (uint64 nonce, uint32 srcEid, uint32 dstEid, bytes32 receiver)
+    internal
+    pure
+    returns (uint64 nonce, uint32 srcEid, uint32 dstEid, bytes32 receiver)
     {
         assembly {
-            nonce := mload(add(packetHeader, 9)) // 8 + 64
-            srcEid := mload(add(packetHeader, 13)) // 8 + 64 + 32
-            dstEid := mload(add(packetHeader, 49)) // 8 + 64 + 32 + 256 + 32
-            receiver := mload(add(packetHeader, 81)) // 8 + 64 + 32 + 256 + 32 + 256
+        // Skip the first 32 bytes (the length)
+            let data := add(packetHeader, 32)
+            nonce := shr(192, mload(add(data, 1)))
+            srcEid := shr(224, mload(add(data, 9)))
+            dstEid := shr(224, mload(add(data, 45)))
+            receiver := mload(add(data, 49))
         }
     }
 
@@ -170,16 +226,13 @@ contract LayerZeroDVNInstance is DVNAdapterBase {
         emit FeeConfigSet(_dstEid, _baseFee);
     }
 
-    function setDstConfig(uint32 _dstEid, uint64 _gas, uint16 _multiplierBps, uint128 _floorMarginUSD)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
-        dstConfig[_dstEid] = DstConfig({gas: _gas, multiplierBps: _multiplierBps, floorMarginUSD: _floorMarginUSD});
-    }
-
-    function setFeeLib(address payable _feeLib) external onlyRole(ADMIN_ROLE) {
-        require(_feeLib != address(0), "LayerZeroDVNInstance: invalid fee lib");
-        feeLib = IDVNFeeLib(_feeLib);
+    /// @param _params array of DstConfigParam
+    function setDstConfig(DstConfigParam[] calldata _params) external onlyRole(ADMIN_ROLE) {
+        for (uint256 i = 0; i < _params.length; ++i) {
+            DstConfigParam calldata param = _params[i];
+            dstConfig[param.dstEid] = DstConfig(param.gas, param.multiplierBps, param.floorMarginUSD);
+        }
+        emit SetDstConfig(_params);
     }
 
     function withdraw(address _to, uint256 _amount) external onlyRole(ADMIN_ROLE) {

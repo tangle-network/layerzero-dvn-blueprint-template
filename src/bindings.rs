@@ -1,11 +1,11 @@
-use blueprint_sdk::alloy::sol_types::sol;
-use blueprint_sdk::macros::load_abi;
+use blueprint_sdk as sdk;
+use sdk::alloy::sol_types::sol;
 use serde::{Deserialize, Serialize};
 
 sol!(
     #![sol(
-        alloy_sol_types = blueprint_sdk::alloy::sol_types,
-        alloy_contract = blueprint_sdk::alloy::contract
+        alloy_sol_types = sdk::alloy::sol_types,
+        alloy_contract = sdk::alloy::contract
     )]
     #[sol(rpc)]
     #[allow(missing_docs)]
@@ -16,20 +16,8 @@ sol!(
 
 sol!(
     #![sol(
-        alloy_sol_types = blueprint_sdk::alloy::sol_types,
-        alloy_contract = blueprint_sdk::alloy::contract
-    )]
-    #[allow(missing_docs)]
-    #[sol(rpc)]
-    #[derive(Debug, Serialize, Deserialize)]
-    SendUlnBase,
-    "contracts/out/SendUlnBase.sol/SendUlnBase.json"
-);
-
-sol!(
-    #![sol(
-        alloy_sol_types = blueprint_sdk::alloy::sol_types,
-        alloy_contract = blueprint_sdk::alloy::contract
+        alloy_sol_types = sdk::alloy::sol_types,
+        alloy_contract = sdk::alloy::contract
     )]
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -40,24 +28,24 @@ sol!(
 
 sol!(
     #![sol(
-        alloy_sol_types = blueprint_sdk::alloy::sol_types,
-        alloy_contract = blueprint_sdk::alloy::contract
-    )]
-    #[allow(missing_docs)]
-    #[sol(rpc)]
-    #[derive(Default, Debug, Serialize, Deserialize)]
-    ISendLib,
-    "contracts/out/ISendLib.sol/ISendLib.json"
-);
-
-sol!(
-    #![sol(
-        alloy_sol_types = blueprint_sdk::alloy::sol_types,
-        alloy_contract = blueprint_sdk::alloy::contract
+        alloy_sol_types = sdk::alloy::sol_types,
+        alloy_contract = sdk::alloy::contract
     )]
     #[allow(missing_docs)]
     #[sol(rpc)]
     #[derive(Debug, Serialize, Deserialize)]
-    ILayerZeroDVN,
-    "contracts/out/ILayerZeroDVN.sol/ILayerZeroDVN.json"
+    ReceiveUln302,
+    "contracts/out/ReceiveUln302.sol/ReceiveUln302.json"
+);
+
+sol!(
+    #![sol(
+        alloy_sol_types = sdk::alloy::sol_types,
+        alloy_contract = sdk::alloy::contract
+    )]
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug, Serialize, Deserialize)]
+    LayerZeroDVNInstance,
+    "contracts/out/LayerZeroDVNInstance.sol/LayerZeroDVNInstance.json"
 );

@@ -1,9 +1,9 @@
 @layerzerolabs/lz-evm-messagelib-v2/=dependencies/@layerzerolabs-lz-evm-messagelib-v2-3.0.75/
 @layerzerolabs/lz-evm-protocol-v2/=dependencies/@layerzerolabs-lz-evm-protocol-v2-3.0.75/
+@layerzerolabs/lz-evm-v1-0-7/=dependencies/@layerzerolabs-lz-evm-v1-0-7-3.0.75/
 @layerzerolabs/lz-evm-v1-0.7/=dependencies/@layerzerolabs-lz-evm-v1-0-7-3.0.75/
 @layerzerolabs/oapp-evm/=dependencies/@layerzerolabs-oapp-evm-0.3.2/
 @layerzerolabs/oft-evm/=dependencies/@layerzerolabs-oft-evm-3.1.3/
-@layerzerolabs/test-devtools-evm-foundry/=node_modules/@layerzerolabs/test-devtools-evm-foundry
 @openzeppelin/contracts-upgradeable/=dependencies/@openzeppelin-contracts-upgradeable-4.9.5/
 @openzeppelin/contracts/=dependencies/@openzeppelin-contracts-4.9.5/
 forge-std/=dependencies/forge-std-1.9.5/src
