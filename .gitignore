@@ -7,6 +7,7 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+# Project configuration
 .idea
 .vscode
 .zed
@@ -16,7 +17,6 @@ target/
 # Solc Compiler files
 cache/
 out/
-dependencies
 
 # Ignores development broadcast logs
 !/broadcast
@@ -29,7 +29,11 @@ docs/
 # Dotenv file
 .env
 
-# Misc
+# Generated blueprint files
+blueprint.json
 blueprint.lock
-yarn-error.log
+
+# Soldeer dependencies
+dependencies/
+
 node_modules
